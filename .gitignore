@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.ex5
+*.log
+telegram_session*
+telegram_config.json
+*.xlsx
+data/
+reports/
+.venv/
+.env
