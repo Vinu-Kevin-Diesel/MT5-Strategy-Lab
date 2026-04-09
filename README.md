@@ -1,8 +1,21 @@
-# AlgoGold: AI-Powered Algorithmic Trading System for XAUUSD
+# MT5 Strategy Lab
 
 An end-to-end algorithmic trading framework that uses **Gaussian signal processing**, **Hidden Markov Model regime detection**, and **multi-strategy portfolio optimization** to trade Gold (XAUUSD) on MetaTrader 5.
 
-Built from scratch — 50+ strategy variants backtested, 6 core EAs developed, and a live-trading pipeline with Telegram signal integration.
+**[Live Interactive Demo](https://vinu-kevin-diesel.github.io/MT5-Strategy-Lab/)** — try it in your browser, no installation needed.
+
+Built from scratch using **Claude Code** as the AI coding agent — 50+ strategy variants backtested, 10 core EAs developed, and automated MT5 backtesting pipeline.
+
+## Built with Claude Code
+
+This entire project was developed iteratively using [Claude Code](https://claude.ai/code) as the AI pair-programming agent:
+
+- **Strategy Research**: Claude analyzed gold market data, computed statistical edges for different entry methods, and identified that Gaussian IIR filters outperform traditional EMA/SMA for trend detection
+- **MQL5 EA Development**: All 10 Expert Advisors were generated, compiled (`metaeditor64.exe`), and tested via `run.py` — the entire write-compile-test loop was automated through Claude Code
+- **Parameter Optimization**: 243-combo grid searches run through MT5's Strategy Tester, with results parsed and ranked automatically
+- **Live Trading Analysis**: Connected to MT5's Python API to pull real trade history, identified that the Beast strategy had 6.7% WR live (vs 38% backtest) due to market regime change, and built kill switches to prevent cascading losses
+- **HMM Integration**: Built a Gaussian Hidden Markov Model regime detector using `hmmlearn`, with a Python-to-MQ5 bridge via CSV file for live regime classification
+- **Iterative Refinement**: Each EA version was backtested across 4 periods (ranging, trending, crash, full) with results compared in tables — Claude tracked which filters helped vs hurt and recommended data-driven improvements
 
 ## Architecture
 
