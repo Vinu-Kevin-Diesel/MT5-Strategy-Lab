@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MT5 Strategy Lab — Interactive Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0e17; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        /* Header */
+        .header { text-align: center; padding: 40px 0 20px; }
+        .header h1 { font-size: 2.2em; color: #ffd700; margin-bottom: 8px; }
+        .header p { color: #888; font-size: 1.1em; }
+        .badge { display: inline-block; background: #1a2332; border: 1px solid #2a3a4a; border-radius: 20px; padding: 4px 14px; margin: 3px; font-size: 0.8em; color: #7eb8da; }
+
+        /* Cards */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin: 30px 0; }
+        .card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 24px; }
+        .card h3 { color: #ffd700; margin-bottom: 12px; font-size: 1.1em; }
+        .card-accent { border-left: 3px solid #ffd700; }
+
+        /* Controls */
+        .controls { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 24px; margin: 20px 0; }
+        .controls h3 { color: #ffd700; margin-bottom: 16px; }
+        .control-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 12px; }
+        label { color: #aaa; font-size: 0.9em; min-width: 120px; }
+        input[type="range"] { flex: 1; min-width: 150px; accent-color: #ffd700; }
+        .val { color: #ffd700; font-weight: bold; min-width: 50px; }
+        select { background: #1a2332; color: #e0e0e0; border: 1px solid #2a3a4a; padding: 6px 12px; border-radius: 6px; }
+        button { background: linear-gradient(135deg, #ffd700, #ff9500); color: #000; border: none; padding: 12px 32px; border-radius: 8px; font-weight: bold; font-size: 1em; cursor: pointer; transition: transform 0.1s; }
+        button:hover { transform: scale(1.03); }
+        button:active { transform: scale(0.97); }
+        .btn-secondary { background: #1e293b; color: #e0e0e0; border: 1px solid #2a3a4a; }
+
+        /* Chart */
+        .chart-container { background: #0d1117; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; margin: 20px 0; position: relative; }
+        canvas { width: 100%; border-radius: 8px; }
+
+        /* Stats */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+        .stat { background: #0d1117; border-radius: 8px; padding: 16px; text-align: center; }
+        .stat-value { font-size: 1.6em; font-weight: bold; color: #ffd700; }
+        .stat-label { font-size: 0.8em; color: #666; margin-top: 4px; }
+        .stat-green .stat-value { color: #22c55e; }
+        .stat-red .stat-value { color: #ef4444; }
+
+        /* Trade log */
+        .trade-log { max-height: 300px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 0.85em; }
+        .trade-log table { width: 100%; border-collapse: collapse; }
+        .trade-log th { color: #666; text-align: left; padding: 6px 8px; border-bottom: 1px solid #1e293b; position: sticky; top: 0; background: #111827; }
+        .trade-log td { padding: 5px 8px; border-bottom: 1px solid #0d1117; }
+        .win { color: #22c55e; }
+        .loss { color: #ef4444; }
+
+        /* Regime bar */
+        .regime-bar { display: flex; height: 30px; border-radius: 6px; overflow: hidden; margin: 12px 0; }
+        .regime-segment { display: flex; align-items: center; justify-content: center; font-size: 0.7em; font-weight: bold; color: #000; }
+
+        /* Gaussian formula */
+        .formula { background: #0d1117; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; font-family: 'Consolas', monospace; margin: 12px 0; font-size: 0.9em; line-height: 1.6; color: #7eb8da; }
+
+        /* Loading */
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .spinner { display: inline-block; width: 30px; height: 30px; border: 3px solid #1e293b; border-top-color: #ffd700; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Responsive */
+        @media (max-width: 600px) { .header h1 { font-size: 1.5em; } .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MT5 Strategy Lab</h1>
+            <p>Gaussian Signal Processing + HMM Regime Detection + Multi-Strategy Portfolio</p>
+            <div style="margin-top: 12px;">
+                <span class="badge">Gaussian IIR Filter</span>
+                <span class="badge">Hidden Markov Model</span>
+                <span class="badge">MACD Momentum</span>
+                <span class="badge">ATR Risk Management</span>
+                <span class="badge">MetaTrader 5</span>
+                <span class="badge">Python</span>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <h3>Strategy Parameters</h3>
+            <div class="control-row">
+                <label>Gaussian Period:</label>
+                <input type="range" id="gaussPeriod" min="20" max="150" value="80" oninput="updateVal(this)">
+                <span class="val" id="gaussPeriod_val">80</span>
+            </div>
+            <div class="control-row">
+                <label>SL Multiplier:</label>
+                <input type="range" id="slMult" min="10" max="30" value="20" oninput="updateVal(this)">
+                <span class="val" id="slMult_val">2.0x</span>
+            </div>
+            <div class="control-row">
+                <label>TP Multiplier:</label>
+                <input type="range" id="tpMult" min="20" max="80" value="50" oninput="updateVal(this)">
+                <span class="val" id="tpMult_val">5.0x</span>
+            </div>
+            <div class="control-row">
+                <label>Max SL ($):</label>
+                <input type="range" id="maxSL" min="10" max="60" value="30" oninput="updateVal(this)">
+                <span class="val" id="maxSL_val">$30</span>
+            </div>
+            <div class="control-row">
+                <label>Data Points:</label>
+                <select id="nBars">
+                    <option value="500">500 bars (fast)</option>
+                    <option value="1000" selected>1000 bars</option>
+                    <option value="2000">2000 bars (detailed)</option>
+                </select>
+                <button onclick="runBacktest()">Run Backtest</button>
+                <button class="btn-secondary" onclick="runBacktest(true)">Randomize Data</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="stats">
+            <div class="stat"><div class="stat-value" id="s_profit">—</div><div class="stat-label">Net Profit</div></div>
+            <div class="stat"><div class="stat-value" id="s_trades">—</div><div class="stat-label">Total Trades</div></div>
+            <div class="stat"><div class="stat-value" id="s_wr">—</div><div class="stat-label">Win Rate</div></div>
+            <div class="stat"><div class="stat-value" id="s_pf">—</div><div class="stat-label">Profit Factor</div></div>
+            <div class="stat"><div class="stat-value" id="s_dd">—</div><div class="stat-label">Max Drawdown</div></div>
+            <div class="stat"><div class="stat-value" id="s_sharpe">—</div><div class="stat-label">Sharpe Ratio</div></div>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid">
+            <div class="chart-container">
+                <h3 style="color:#ffd700; margin-bottom:12px;">Price + Gaussian Filter</h3>
+                <canvas id="priceChart" height="300"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3 style="color:#ffd700; margin-bottom:12px;">Equity Curve</h3>
+                <canvas id="equityChart" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- Regime Bar -->
+        <div class="card">
+            <h3>HMM Regime Detection</h3>
+            <div class="regime-bar" id="regimeBar"></div>
+            <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:8px; font-size:0.8em;">
+                <span><span style="color:#22c55e;">&#9632;</span> Strong Bull</span>
+                <span><span style="color:#86efac;">&#9632;</span> Mild Bull</span>
+                <span><span style="color:#fbbf24;">&#9632;</span> Neutral</span>
+                <span><span style="color:#fb923c;">&#9632;</span> Mild Bear</span>
+                <span><span style="color:#ef4444;">&#9632;</span> Strong Bear</span>
+            </div>
+        </div>
+
+        <!-- Trade Log + Formula -->
+        <div class="grid">
+            <div class="card">
+                <h3>Trade Log (Last 20)</h3>
+                <div class="trade-log" id="tradeLog"></div>
+            </div>
+            <div class="card card-accent">
+                <h3>Gaussian IIR Filter — The Math</h3>
+                <div class="formula">
+                    beta = (1 - cos(2*PI/period)) / (2^(1/poles) - 1)<br>
+                    alpha = -beta + sqrt(beta^2 + 2*beta)<br><br>
+                    // Applied recursively (4 poles):<br>
+                    for each pole:<br>
+                    &nbsp;&nbsp;output[i] = alpha * input[i] + (1-alpha) * output[i-1]
+                </div>
+                <p style="color:#888; font-size:0.85em; margin-top:12px;">
+                    John Ehlers' multi-pole recursive IIR filter approximates a true Gaussian distribution curve.
+                    4-pole version provides maximum smoothing with minimal lag — significantly outperforms EMA/SMA for trend detection.
+                </p>
+                <h3 style="margin-top:20px;">Why This Works</h3>
+                <p style="color:#888; font-size:0.85em; margin-top:8px;">
+                    Traditional moving averages (EMA, SMA) introduce significant lag or noise.
+                    The Gaussian filter mathematically separates signal from noise by convolving price with a bell curve — heavy weight on recent bars, exponentially decaying on older bars.
+                    Combined with MACD momentum confirmation and ATR-based risk management, this creates a robust trend-following system.
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align:center; padding:30px 0; color:#444; font-size:0.85em;">
+            <p>Built by Vinukevin Diesel S P | <a href="https://github.com/Vinu-Kevin-Diesel/MT5-Strategy-Lab" style="color:#7eb8da;">GitHub Repository</a></p>
+            <p style="margin-top:4px;">Educational project — past backtest performance does not guarantee future results.</p>
+        </div>
+    </div>
+
+    <script>
+    // ═══════════════════════════════════════════════════════════════
+    //  SYNTHETIC DATA GENERATION
+    // ═══════════════════════════════════════════════════════════════
+    function generateGoldData(n, seed) {
+        let rng = seed || Math.random() * 10000;
+        function rand() { rng = (rng * 16807 + 0) % 2147483647; return rng / 2147483647; }
+        function randn() { return Math.sqrt(-2 * Math.log(rand())) * Math.cos(2 * Math.PI * rand()); }
+
+        let price = 2000, prices = [price], regimes = [0];
+        let regime = 0, rBars = 0;
+
+        for (let i = 1; i < n; i++) {
+            rBars++;
+            if (rBars > 100 + rand() * 300) {
+                let r = rand();
+                regime = r < 0.3 ? 0 : r < 0.8 ? 1 : 2;
+                rBars = 0;
+            }
+            let drift = regime === 0 ? randn() * 0.0002 : regime === 1 ? 0.0008 + randn() * 0.0003 : -0.0006 + randn() * 0.0003;
+            let vol = regime === 0 ? 0.003 : regime === 1 ? 0.005 : 0.006;
+            price *= (1 + drift + randn() * vol);
+            prices.push(price);
+            regimes.push(regime);
+        }
+
+        let closes = prices;
+        let highs = closes.map((c, i) => c * (1 + 0.001 + rand() * 0.003));
+        let lows = closes.map((c, i) => c * (1 - 0.001 - rand() * 0.003));
+        return { closes, highs, lows, regimes };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  GAUSSIAN FILTER
+    // ═══════════════════════════════════════════════════════════════
+    function gaussianFilter(close, period, poles) {
+        let beta = (1 - Math.cos(2 * Math.PI / period)) / (Math.pow(2, 1.0 / poles) - 1);
+        let alpha = -beta + Math.sqrt(beta * beta + 2 * beta);
+        let result = [...close];
+        for (let p = 0; p < poles; p++) {
+            let buf = [...result];
+            for (let j = 1; j < result.length; j++)
+                buf[j] = alpha * result[j] + (1 - alpha) * buf[j - 1];
+            result = buf;
+        }
+        return result;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  INDICATORS
+    // ═══════════════════════════════════════════════════════════════
+    function calcATR(highs, lows, closes, period) {
+        let tr = [highs[0] - lows[0]];
+        for (let i = 1; i < closes.length; i++)
+            tr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i-1]), Math.abs(lows[i] - closes[i-1])));
+        let atr = new Array(closes.length).fill(NaN);
+        atr[period] = tr.slice(1, period + 1).reduce((a, b) => a + b) / period;
+        for (let i = period + 1; i < closes.length; i++)
+            atr[i] = (atr[i-1] * (period - 1) + tr[i]) / period;
+        return atr;
+    }
+
+    function calcMACD(close) {
+        let ef = [close[0]], es = [close[0]], af = 2/13, as2 = 2/27, asig = 2/10;
+        for (let i = 1; i < close.length; i++) {
+            ef.push(af * close[i] + (1 - af) * ef[i-1]);
+            es.push(as2 * close[i] + (1 - as2) * es[i-1]);
+        }
+        let macd = ef.map((v, i) => v - es[i]);
+        let sig = [macd[0]];
+        for (let i = 1; i < macd.length; i++) sig.push(asig * macd[i] + (1 - asig) * sig[i-1]);
+        return macd.map((v, i) => v - sig[i]);
+    }
+
+    function calcRSI(close, period) {
+        let rsi = new Array(close.length).fill(50);
+        let gains = [], losses = [];
+        for (let i = 1; i < close.length; i++) {
+            let d = close[i] - close[i-1];
+            gains.push(d > 0 ? d : 0); losses.push(d < 0 ? -d : 0);
+        }
+        let ag = gains.slice(0, period).reduce((a,b) => a+b) / period;
+        let al = losses.slice(0, period).reduce((a,b) => a+b) / period;
+        rsi[period] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+        for (let j = period; j < gains.length; j++) {
+            ag = (ag * (period - 1) + gains[j]) / period;
+            al = (al * (period - 1) + losses[j]) / period;
+            rsi[j + 1] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+        }
+        return rsi;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  HMM-LIKE REGIME DETECTION
+    // ═══════════════════════════════════════════════════════════════
+    function detectRegimes(closes, period) {
+        let regimes = new Array(closes.length).fill(3);
+        for (let i = period; i < closes.length; i++) {
+            let ret = (closes[i] - closes[i - period]) / closes[i - period] * 100;
+            if (ret > 3) regimes[i] = 1;
+            else if (ret > 1) regimes[i] = 2;
+            else if (ret < -3) regimes[i] = 5;
+            else if (ret < -1) regimes[i] = 4;
+        }
+        return regimes;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  BACKTEST
+    // ═══════════════════════════════════════════════════════════════
+    function backtest(data, gauss, macdHist, rsi, atr, params) {
+        let balance = 1000, equity = [1000], trades = [], pos = null;
+        let { slMult, tpMult, maxSL } = params;
+
+        for (let i = 2; i < data.closes.length; i++) {
+            if (isNaN(atr[i]) || atr[i] < 0.5) { equity.push(balance); continue; }
+
+            if (pos) {
+                if (pos.dir === 1) {
+                    if (data.lows[i] <= pos.sl) { let pnl = pos.sl - pos.entry; balance += pnl; trades.push({i, pnl, dir:'BUY'}); pos = null; }
+                    else if (data.highs[i] >= pos.tp) { let pnl = pos.tp - pos.entry; balance += pnl; trades.push({i, pnl, dir:'BUY'}); pos = null; }
+                } else {
+                    if (data.highs[i] >= pos.sl) { let pnl = pos.entry - pos.sl; balance += pnl; trades.push({i, pnl, dir:'SELL'}); pos = null; }
+                    else if (data.lows[i] <= pos.tp) { let pnl = pos.entry - pos.tp; balance += pnl; trades.push({i, pnl, dir:'SELL'}); pos = null; }
+                }
+            }
+            equity.push(balance);
+            if (pos || i < 100) continue;
+
+            let g1 = gauss[i-1], g2 = gauss[i-2], mh1 = macdHist[i-1], mh2 = macdHist[i-2];
+            if (!g1 || !g2) continue;
+
+            let sd = atr[i-1] * slMult, td = atr[i-1] * tpMult;
+            if (sd > maxSL) { let r = tpMult / slMult; sd = maxSL; td = sd * r; }
+
+            if (g1 > g2 && mh1 > mh2 && mh1 > -0.5 && data.closes[i-1] > g1 && rsi[i-1] < 80)
+                pos = { dir: 1, entry: data.closes[i], sl: data.closes[i] - sd, tp: data.closes[i] + td };
+            else if (g1 < g2 && mh1 < mh2 && mh1 < 0.5 && data.closes[i-1] < g1 && rsi[i-1] > 28)
+                pos = { dir: -1, entry: data.closes[i], sl: data.closes[i] + sd, tp: data.closes[i] - td };
+        }
+        return { equity, trades };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  DRAWING
+    // ═══════════════════════════════════════════════════════════════
+    function drawChart(canvasId, datasets, title) {
+        let canvas = document.getElementById(canvasId);
+        let ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth * 2; canvas.height = 600;
+        ctx.scale(2, 2);
+        let w = canvas.offsetWidth, h = 300;
+
+        ctx.fillStyle = '#0d1117'; ctx.fillRect(0, 0, w, h);
+
+        let allVals = datasets.flatMap(d => d.data.filter(v => !isNaN(v)));
+        let minV = Math.min(...allVals), maxV = Math.max(...allVals);
+        let pad = (maxV - minV) * 0.05; minV -= pad; maxV += pad;
+
+        // Grid
+        ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 0.5;
+        for (let i = 0; i < 5; i++) {
+            let y = 20 + (h - 40) * i / 4;
+            ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(w - 10, y); ctx.stroke();
+            let val = maxV - (maxV - minV) * i / 4;
+            ctx.fillStyle = '#444'; ctx.font = '10px Consolas';
+            ctx.fillText('$' + val.toFixed(0), 2, y + 4);
+        }
+
+        datasets.forEach(ds => {
+            ctx.strokeStyle = ds.color; ctx.lineWidth = ds.width || 1.5;
+            ctx.beginPath();
+            let step = (w - 50) / ds.data.length;
+            for (let i = 0; i < ds.data.length; i++) {
+                if (isNaN(ds.data[i])) continue;
+                let x = 40 + i * step;
+                let y = 20 + (h - 40) * (1 - (ds.data[i] - minV) / (maxV - minV));
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        });
+
+        // Legend
+        let lx = 50;
+        datasets.forEach(ds => {
+            ctx.fillStyle = ds.color; ctx.fillRect(lx, h - 15, 12, 3);
+            ctx.fillStyle = '#888'; ctx.font = '10px Segoe UI';
+            ctx.fillText(ds.label, lx + 16, h - 10);
+            lx += ctx.measureText(ds.label).width + 30;
+        });
+    }
+
+    function drawRegimeBar(regimes) {
+        let bar = document.getElementById('regimeBar');
+        let colors = {1:'#22c55e', 2:'#86efac', 3:'#fbbf24', 4:'#fb923c', 5:'#ef4444'};
+        let names = {1:'Bull', 2:'Mild+', 3:'Neutral', 4:'Mild-', 5:'Bear'};
+
+        // Compress into segments
+        let segments = []; let curr = regimes[0], count = 1;
+        for (let i = 1; i < regimes.length; i++) {
+            if (regimes[i] === curr) count++;
+            else { segments.push({r: curr, count}); curr = regimes[i]; count = 1; }
+        }
+        segments.push({r: curr, count});
+
+        bar.innerHTML = segments.map(s =>
+            `<div class="regime-segment" style="flex:${s.count};background:${colors[s.r] || '#333'}">${s.count > regimes.length * 0.05 ? names[s.r] || '' : ''}</div>`
+        ).join('');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  MAIN
+    // ═══════════════════════════════════════════════════════════════
+    function updateVal(el) {
+        let id = el.id;
+        if (id === 'slMult') document.getElementById(id + '_val').textContent = (el.value / 10).toFixed(1) + 'x';
+        else if (id === 'tpMult') document.getElementById(id + '_val').textContent = (el.value / 10).toFixed(1) + 'x';
+        else if (id === 'maxSL') document.getElementById(id + '_val').textContent = '$' + el.value;
+        else document.getElementById(id + '_val').textContent = el.value;
+    }
+
+    let currentSeed = 42;
+
+    function runBacktest(randomize) {
+        if (randomize) currentSeed = Math.floor(Math.random() * 100000);
+
+        let gp = parseInt(document.getElementById('gaussPeriod').value);
+        let sl = parseInt(document.getElementById('slMult').value) / 10;
+        let tp = parseInt(document.getElementById('tpMult').value) / 10;
+        let maxSL = parseInt(document.getElementById('maxSL').value);
+        let n = parseInt(document.getElementById('nBars').value);
+
+        let data = generateGoldData(n, currentSeed);
+        let gauss = gaussianFilter(data.closes, gp, 4);
+        let atr = calcATR(data.highs, data.lows, data.closes, 14);
+        let macdHist = calcMACD(data.closes);
+        let rsi = calcRSI(data.closes, 14);
+        let regimes = detectRegimes(data.closes, 50);
+
+        let result = backtest(data, gauss, macdHist, rsi, atr, { slMult: sl, tpMult: tp, maxSL });
+
+        // Stats
+        let wins = result.trades.filter(t => t.pnl > 0);
+        let losses = result.trades.filter(t => t.pnl <= 0);
+        let net = result.trades.reduce((a, t) => a + t.pnl, 0);
+        let wr = result.trades.length ? (wins.length / result.trades.length * 100) : 0;
+        let grossWin = wins.reduce((a, t) => a + t.pnl, 0);
+        let grossLoss = Math.abs(losses.reduce((a, t) => a + t.pnl, 0));
+        let pf = grossLoss > 0 ? grossWin / grossLoss : 999;
+        let maxEq = result.equity.reduce((acc, v, i) => { acc.push(Math.max(v, i > 0 ? acc[i-1] : v)); return acc; }, []);
+        let dd = result.equity.map((v, i) => maxEq[i] > 0 ? (maxEq[i] - v) / maxEq[i] * 100 : 0);
+        let maxDD = Math.max(...dd);
+        let avgRet = result.trades.length ? net / result.trades.length : 0;
+        let stdRet = result.trades.length > 1 ? Math.sqrt(result.trades.map(t => (t.pnl - avgRet) ** 2).reduce((a,b) => a+b) / (result.trades.length - 1)) : 1;
+        let sharpe = stdRet > 0 ? (avgRet / stdRet * Math.sqrt(252)) : 0;
+
+        // Update stats
+        let pEl = document.getElementById('s_profit'); pEl.textContent = '$' + net.toFixed(2); pEl.parentElement.className = 'stat ' + (net >= 0 ? 'stat-green' : 'stat-red');
+        document.getElementById('s_trades').textContent = result.trades.length;
+        document.getElementById('s_wr').textContent = wr.toFixed(1) + '%';
+        document.getElementById('s_pf').textContent = pf.toFixed(2);
+        let ddEl = document.getElementById('s_dd'); ddEl.textContent = maxDD.toFixed(1) + '%'; ddEl.parentElement.className = 'stat ' + (maxDD < 20 ? 'stat-green' : 'stat-red');
+        document.getElementById('s_sharpe').textContent = sharpe.toFixed(2);
+
+        // Charts
+        drawChart('priceChart', [
+            { data: data.closes, color: '#4a9eff', label: 'Price', width: 1 },
+            { data: gauss, color: '#ffd700', label: 'Gaussian(' + gp + ')', width: 2 },
+        ]);
+        drawChart('equityChart', [
+            { data: result.equity, color: net >= 0 ? '#22c55e' : '#ef4444', label: 'Equity', width: 2 },
+        ]);
+
+        // Regime bar
+        drawRegimeBar(regimes);
+
+        // Trade log
+        let logHtml = '<table><tr><th>#</th><th>Bar</th><th>Dir</th><th>P&L</th></tr>';
+        result.trades.slice(-20).forEach((t, i) => {
+            let cls = t.pnl > 0 ? 'win' : 'loss';
+            logHtml += `<tr class="${cls}"><td>${result.trades.length - 20 + i + 1}</td><td>${t.i}</td><td>${t.dir}</td><td>$${t.pnl.toFixed(2)}</td></tr>`;
+        });
+        logHtml += '</table>';
+        document.getElementById('tradeLog').innerHTML = logHtml;
+    }
+
+    // Run on load
+    window.onload = () => runBacktest();
+    window.onresize = () => runBacktest();
+    </script>
+</body>
+</html>
